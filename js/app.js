@@ -7,15 +7,12 @@ import { ref, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-
 import { signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
 let localUserData = null;
-let isAppInitialized = false; 
+let isAppInitialized = false;
 
-// Инициализация приложения при загрузке
 document.addEventListener('DOMContentLoaded', () => {
-    // Инициализируем кнопку принудительного выхода, чтобы можно было сменить аккаунт Google
     initLogoutButton();
 
     initAuth((user, data) => {
-        // Если пользователь не авторизован или вылогинился
         if (!user || !data) {
             localUserData = null;
             updateUIForGuest();
@@ -23,27 +20,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         localUserData = data;
-        
-        // Обновляем шапку профиля (Баланс и Имя)
+
         const userPill = document.getElementById('userPill');
         const userBalance = document.getElementById('userBalance');
-        
         if (userPill) userPill.textContent = data.username.toUpperCase();
         if (userBalance) userBalance.textContent = `$${Number(data.balance).toFixed(2)}`;
-        
-        // Сборка интерфейса при первом входе
+
         if (!isAppInitialized) {
             initApp();
             isAppInitialized = true;
         }
 
-        // Автоматический перерендер инвентаря и апгрейдов при любых изменениях в базе данных Firebase
-        if (typeof renderInventory === 'function') {
-            renderInventory(data);
-        } else {
-            console.warn("⚠️ Функция renderInventory не найдена в импорте inventory.js");
-        }
-        
+        renderInventory(data);
         initUpgradePage(data);
     });
 });
@@ -56,15 +44,13 @@ function updateUIForGuest() {
     isAppInitialized = false;
 }
 
-// Функция для принудительного разлогина (чтобы сбросить авто-вход Google)
 function initLogoutButton() {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.onclick = async () => {
             try {
                 await signOut(auth);
-                console.log("🔄 Вы успешно вышли из аккаунта. Теперь можно войти под другим пользователем.");
-                window.location.reload(); // Перезагружаем страницу для очистки состояний
+                window.location.reload();
             } catch (err) {
                 console.error("Ошибка при выходе:", err);
             }
@@ -77,21 +63,20 @@ function initApp() {
     initNavigation();
     initBalanceCheat();
     initModalEvents();
-    initCaseOpenEvent(); 
+    initCaseOpenEvent();
+    initLiveTicker();
 }
 
-// Навигация между страницами
+// Навигация
 function initNavigation() {
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const targetPageId = tab.dataset.page;
             const targetPage = document.getElementById(targetPageId);
-            
             if (!targetPage) return;
 
             document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            
             tab.classList.add('active');
             targetPage.classList.add('active');
         });
@@ -107,9 +92,13 @@ function renderCasesTabs() {
         const card = document.createElement('div');
         card.className = 'case-card';
         card.innerHTML = `
-            ${c.badge ? `<span class="case-badge ${c.badgeClass}">${c.badge}</span>` : ''}
+            ${c.badge ? `<span class="case-badge ${c.badgeClass || ''}">${c.badge}</span>` : ''}
             <div class="case-card-art">
-                 <svg viewBox="0 0 100 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 20L50 5L90 20L50 35L10 20Z" fill="#e4ae39" opacity="0.8"/><path d="M10 20L50 35V75L10 55V20Z" fill="#c8922a"/><path d="M90 20L50 35V75L90 55V20Z" fill="#a4751c"/></svg>
+                <svg viewBox="0 0 100 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 20L50 5L90 20L50 35L10 20Z" fill="#e4ae39" opacity="0.8"/>
+                    <path d="M10 20L50 35V75L10 55V20Z" fill="#c8922a"/>
+                    <path d="M90 20L50 35V75L90 55V20Z" fill="#a4751c"/>
+                </svg>
             </div>
             <div class="case-card-body">
                 <div class="case-card-name">${c.name}</div>
@@ -122,14 +111,13 @@ function renderCasesTabs() {
 
     if (officialGrid) {
         officialGrid.innerHTML = '';
-        if (casesData && casesData.official) {
+        if (casesData?.official) {
             Object.entries(casesData.official).forEach(([id, c]) => officialGrid.appendChild(buildCard(id, c, false)));
         }
     }
-    
     if (customGrid) {
         customGrid.innerHTML = '';
-        if (casesData && casesData.custom) {
+        if (casesData?.custom) {
             Object.entries(casesData.custom).forEach(([id, c]) => customGrid.appendChild(buildCard(id, c, true)));
         }
     }
@@ -137,169 +125,201 @@ function renderCasesTabs() {
 
 let currentActiveCase = null;
 
-// Открытие модального окна кейса
+// Открытие модального окна
 function openCaseModal(caseId, isCustom) {
     currentActiveCase = { id: caseId, isCustom };
     const pool = isCustom ? casesData.custom[caseId] : casesData.official[caseId];
-
     if (!pool) return;
 
-    const modalCaseName = document.getElementById('modalCaseName');
-    const modalCasePrice = document.getElementById('modalCasePrice');
-    const overlay = document.getElementById('caseModalOverlay');
+    document.getElementById('modalCaseName').textContent = pool.name;
+    document.getElementById('modalCasePrice').textContent = `$${pool.price.toFixed(2)}`;
 
-    if (modalCaseName) modalCaseName.textContent = pool.name;
-    if (modalCasePrice) modalCasePrice.textContent = `$${pool.price.toFixed(2)}`;
-    
-    // Предзаполняем рулетку красивыми скинами из кейса
-    fillCasePreviewItems(pool);
+    // Сбрасываем рулетку к исходному виду
+    resetRoulette(pool);
 
-    if (overlay) overlay.classList.add('active');
+    document.getElementById('caseModalOverlay').classList.add('active');
 }
 
-// Заполнение рулетки скинами перед стартом
-function fillCasePreviewItems(casePool) {
-    // ВАЖНО: Ищем селектор. Если класса .roulette-container нет, ищем ЛЮБОЙ блок внутри черного окна рулетки
-    let rouletteContainer = document.querySelector('.roulette-container') || document.querySelector('#caseModalOverlay .modal-body div');
-    
-    if (!rouletteContainer) {
-        console.error("❌ Ошибка: Контейнер для прокрутки рулетки (.roulette-container) не найден в HTML!");
-        return;
-    }
+// Заполняем рулетку предметами кейса для предпросмотра
+function resetRoulette(casePool) {
+    const track = document.getElementById('rouletteTrack');
+    if (!track) return;
 
-    rouletteContainer.innerHTML = '';
-    rouletteContainer.style.transition = 'none';
-    rouletteContainer.style.transform = 'translateX(0)';
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(0)';
+    track.innerHTML = '';
 
     if (!casePool.items) return;
 
-    casePool.items.forEach(item => {
-        const itemBlock = document.createElement('div');
-        itemBlock.className = `roulette-skin-card ${item.rarity || 'mil-spec'}`;
-        if (item.color) itemBlock.style.borderBottom = `4px solid ${item.color}`;
-        
-        itemBlock.innerHTML = `
-            <div class="card-weapon" style="font-weight:bold; font-size:12px; color:#fff;">${item.name.split(' | ')[0]}</div>
-            <div class="card-skin" style="font-size:11px; color:#aaa;">${item.name.split(' | ')[1] || 'Vanilla'}</div>
-        `;
-        rouletteContainer.appendChild(itemBlock);
+    // Повторяем предметы 5 раз для длины
+    const items = [];
+    for (let i = 0; i < 5; i++) items.push(...casePool.items);
+
+    items.forEach(item => {
+        track.appendChild(buildRouletteCard(item));
     });
 }
 
-// Клик на кнопку "ОТКРЫТЬ КЕЙС"
+function buildRouletteCard(item) {
+    const el = document.createElement('div');
+    el.className = `roulette-skin-card ${item.rarity || 'mil-spec'}`;
+    el.style.cssText = 'min-width:130px; margin-right:8px; text-align:center; padding:12px 8px; background:rgba(255,255,255,0.05); border-radius:6px; flex-shrink:0;';
+    if (item.color) el.style.borderBottom = `4px solid ${item.color}`;
+
+    const parts = item.name.split(' | ');
+    el.innerHTML = `
+        <div style="font-weight:700; font-size:11px; color:#fff; margin-bottom:4px;">${parts[0]}</div>
+        <div style="font-size:10px; color:#aaa;">${parts[1] || 'Vanilla'}</div>
+    `;
+    return el;
+}
+
+// Кнопка "ОТКРЫТЬ КЕЙС"
 function initCaseOpenEvent() {
     const openCaseBtn = document.getElementById('openCaseBtn');
     if (!openCaseBtn) return;
 
     openCaseBtn.onclick = async () => {
         if (!auth.currentUser || !localUserData) {
-            alert("Пожалуйста, войдите в аккаунт!");
+            showToast('⚠️ Войдите в аккаунт!', 'warn');
             return;
         }
         if (!currentActiveCase) return;
 
-        openCaseBtn.disabled = true;
+        const pool = currentActiveCase.isCustom
+            ? casesData.custom[currentActiveCase.id]
+            : casesData.official[currentActiveCase.id];
 
-        // Бэкенд-запрос: списывает деньги в БД и генерирует дроп
+        if (!pool) return;
+
+        if (localUserData.balance < pool.price) {
+            showToast(`❌ Недостаточно средств! Нужно $${pool.price.toFixed(2)}`, 'error');
+            return;
+        }
+
+        openCaseBtn.disabled = true;
+        openCaseBtn.textContent = 'ОТКРЫВАЕМ...';
+
         const winItem = await openCase(currentActiveCase.id, localUserData);
 
         if (winItem) {
-            // Запуск анимации прокрутки
             animateRoulette(winItem);
         } else {
             openCaseBtn.disabled = false;
+            openCaseBtn.textContent = 'ОТКРЫТЬ КЕЙС';
+            showToast('❌ Ошибка при открытии кейса', 'error');
         }
     };
 }
 
-// Функция анимации прокрутки рулетки к выигранному скину
+// Анимация рулетки — теперь использует правильный #rouletteTrack
 function animateRoulette(winItem) {
-    let rouletteContainer = document.querySelector('.roulette-container') || document.querySelector('#caseModalOverlay .modal-body div');
+    const track = document.getElementById('rouletteTrack');
     const openCaseBtn = document.getElementById('openCaseBtn');
-    
-    if (!rouletteContainer) {
-        alert(`🎉 Вы выбили: ${winItem.name} ($${winItem.price.toFixed(2)})`);
-        if (openCaseBtn) openCaseBtn.disabled = false;
+
+    if (!track) {
+        showToast(`🎉 Выбит: ${winItem.name} ($${winItem.price.toFixed(2)})`, 'win');
+        if (openCaseBtn) { openCaseBtn.disabled = false; openCaseBtn.textContent = 'ОТКРЫТЬ КЕЙС'; }
         return;
     }
 
-    // Принудительно задаем контейнеру flex-стили, чтобы карточки выстроились в одну горизонтальную линию
-    rouletteContainer.style.display = 'flex';
-    rouletteContainer.style.flexDirection = 'row';
-    rouletteContainer.style.whiteSpace = 'nowrap';
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(0)';
+    track.innerHTML = '';
 
-    rouletteContainer.innerHTML = '';
-    const pool = currentActiveCase.isCustom ? casesData.custom[currentActiveCase.id] : casesData.official[currentActiveCase.id];
-    
-    let longItemsList = [];
-    // Делаем цепочку из 45 предметов для долгого и красивого кручения
-    for (let i = 0; i < 45; i++) {
-        const randomItem = pool.items[Math.floor(Math.random() * pool.items.length)];
-        longItemsList.push(randomItem);
+    const pool = currentActiveCase.isCustom
+        ? casesData.custom[currentActiveCase.id]
+        : casesData.official[currentActiveCase.id];
+
+    // Строим ленту из 50 предметов
+    const longList = [];
+    for (let i = 0; i < 50; i++) {
+        longList.push(pool.items[Math.floor(Math.random() * pool.items.length)]);
     }
-    
-    // Вшиваем реальный выигрыш ровно на 36-ю позицию ленты
-    const winIndex = 35;
-    longItemsList[winIndex] = winItem;
 
-    // Рендерим длинную ленту карточек
-    longItemsList.forEach((item) => {
-        const el = document.createElement('div');
-        el.className = `roulette-skin-card ${item.rarity || 'mil-spec'}`;
-        el.style.minWidth = '130px'; // Фиксируем ширину карточки в JS для точности расчетов
-        el.style.marginRight = '10px';
-        el.style.textAlign = 'center';
-        el.style.padding = '10px';
-        el.style.background = 'rgba(255,255,255,0.05)';
-        if (item.color) el.style.borderBottom = `4px solid ${item.color}`;
-        
-        el.innerHTML = `
-            <div class="card-weapon" style="font-weight:bold; color:#fff;">${item.name.split(' | ')[0]}</div>
-            <div class="card-skin" style="color:#bbb; font-size:12px;">${item.name.split(' | ')[1] || 'Vanilla'}</div>
-        `;
-        rouletteContainer.appendChild(el);
+    const WIN_INDEX = 38;
+    longList[WIN_INDEX] = winItem;
+
+    longList.forEach(item => track.appendChild(buildRouletteCard(item)));
+
+    const CARD_W = 138; // 130px + 8px margin
+    const parentW = track.parentElement.offsetWidth || 600;
+    const shift = (WIN_INDEX * CARD_W) - (parentW / 2) + (CARD_W / 2);
+
+    // Запускаем анимацию
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            track.style.transition = 'transform 5s cubic-bezier(0.05, 0.45, 0.1, 1)';
+            track.style.transform = `translateX(-${shift}px)`;
+        });
     });
 
-    // Сброс позиции в ноль
-    rouletteContainer.style.transition = 'none';
-    rouletteContainer.style.transform = 'translateX(0)';
-
-    // Расчет точного сдвига к центру 36-й карточки
-    const cardWidth = 140; // 130px ширина + 10px отступ marginRight
-    const parentWidth = rouletteContainer.parentElement.offsetWidth || 600;
-    const finalShift = (winIndex * cardWidth) - (parentWidth / 2) + (cardWidth / 2);
-
-    // Включаем прокрутку со стильной физикой замедления CS:GO (cubic-bezier)
+    // После анимации
     setTimeout(() => {
-        rouletteContainer.style.transition = 'transform 4.5s cubic-bezier(0.05, 0.45, 0.1, 1)';
-        rouletteContainer.style.transform = `translateX(-${finalShift}px)`;
-    }, 50);
-
-    // Окончание анимации
-    setTimeout(() => {
-        // Показываем красивое всплывающее уведомление
-        showWinAlert(winItem);
-        if (openCaseBtn) openCaseBtn.disabled = false; 
-    }, 4600);
+        showWinToast(winItem);
+        addToLiveTicker(winItem);
+        if (openCaseBtn) {
+            openCaseBtn.disabled = false;
+            openCaseBtn.textContent = 'ОТКРЫТЬ ЕЩЁ';
+        }
+    }, 5100);
 }
 
-// Кастомное модальное окно выигрыша (чтобы не использовать уродливый браузерный alert)
-function showWinAlert(item) {
-    alert(`🎉 ВЫ ВЫБИЛИ ПРЕДМЕТ!\n\n${item.name}\nРеальная стоимость: $${item.price.toFixed(2)}`);
+// Красивый тост победы вместо alert()
+function showWinToast(item) {
+    const rarityLabel = {
+        'covert': '🔴 ТАЙНОЕ',
+        'classified': '🟣 ЗАСЕКРЕЧЕННОЕ',
+        'restricted': '🟣 ЗАПРЕЩЁННОЕ',
+        'mil-spec': '🔵 АРМЕЙСКОЕ'
+    };
+    const label = rarityLabel[item.rarity] || '🎁';
+    showToast(`${label} ${item.name} • $${item.price.toFixed(2)}`, 'win', 6000);
 }
 
+// Тост-система
+function showToast(message, type = 'info', duration = 3500) {
+    const wrap = document.getElementById('toastWrap');
+    if (!wrap) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+
+    const colors = { win: '#e4ae39', error: '#eb4b4b', warn: '#ff9800', info: '#4b69ff' };
+    toast.style.cssText = `
+        background: #1a1a2e;
+        border-left: 4px solid ${colors[type] || colors.info};
+        color: #fff;
+        padding: 14px 20px;
+        border-radius: 6px;
+        margin-top: 10px;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+        font-size: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        animation: fadeInRight 0.3s ease;
+        max-width: 380px;
+        word-break: break-word;
+    `;
+
+    wrap.appendChild(toast);
+    setTimeout(() => toast.remove(), duration);
+}
+
+// Закрытие модального окна
 function initModalEvents() {
     const closeBtn = document.getElementById('closeModalBtn');
     const overlay = document.getElementById('caseModalOverlay');
-    
     if (closeBtn && overlay) {
-        closeBtn.onclick = () => {
-            overlay.classList.remove('active');
-        };
+        closeBtn.onclick = () => overlay.classList.remove('active');
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.classList.remove('active');
+        });
     }
 }
 
-// Кнопка тестового баланса
+// Кнопка +$100 (тестовый баланс)
 function initBalanceCheat() {
     const addFundsBtn = document.getElementById('addFundsBtn');
     if (!addFundsBtn) return;
@@ -307,13 +327,52 @@ function initBalanceCheat() {
     addFundsBtn.onclick = async () => {
         const user = auth.currentUser;
         if (!user || !localUserData) return;
-        
         try {
             await update(ref(db, `users/${user.uid}`), {
                 balance: Number((localUserData.balance + 100).toFixed(2))
             });
+            showToast('+$100 добавлено!', 'info');
         } catch (error) {
-            console.error("Ошибка при начислении тестового баланса:", error);
+            console.error("Ошибка при начислении баланса:", error);
         }
     };
+}
+
+// Live-тикер дропов (заполняем фейковыми данными для красоты)
+function initLiveTicker() {
+    const inner = document.getElementById('tickerInner');
+    if (!inner) return;
+
+    const fakeDemos = [
+        { name: 'AK-47 | Inheritance', rarity: 'covert', color: '#eb4b4b', price: 35.00 },
+        { name: 'USP-S | Printstream', rarity: 'covert', color: '#eb4b4b', price: 33.00 },
+        { name: 'AWP | Chrome Cannon', rarity: 'covert', color: '#eb4b4b', price: 41.00 },
+        { name: 'M4A1-S | Black Lotus', rarity: 'restricted', color: '#8847ff', price: 2.50 },
+        { name: 'AWP | Chromatic Aberration', rarity: 'classified', color: '#d32ce6', price: 9.50 }
+    ];
+
+    fakeDemos.forEach(item => {
+        const el = buildTickerItem(item);
+        inner.appendChild(el);
+    });
+}
+
+function addToLiveTicker(item) {
+    const inner = document.getElementById('tickerInner');
+    if (!inner) return;
+    const el = buildTickerItem(item);
+    el.style.animation = 'none';
+    inner.prepend(el);
+}
+
+function buildTickerItem(item) {
+    const el = document.createElement('div');
+    el.className = 'ticker-item';
+    el.style.cssText = `display:inline-flex; align-items:center; gap:8px; padding:4px 16px; margin-right:4px; border-left:3px solid ${item.color || '#4b69ff'};`;
+    el.innerHTML = `
+        <span style="font-size:12px; color:#aaa;">PLAYER_${Math.floor(Math.random()*9999)}</span>
+        <span style="font-size:13px; font-weight:700; color:#fff;">${item.name}</span>
+        <span style="font-size:12px; color:${item.color || '#4b69ff'};">$${item.price.toFixed(2)}</span>
+    `;
+    return el;
 }
