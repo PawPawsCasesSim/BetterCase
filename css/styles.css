@@ -1,0 +1,775 @@
+/* ═══════════════════════════════════════
+   1. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И ОБНУЛЕНИЕ
+   ═══════════════════════════════════════ */
+:root {
+    --bg-darker: #08090d;
+    --bg-dark: #0f1118;
+    --bg-panel: #141722;
+    --bg-card: #1b1f2e;
+    --gold: #e4ae39;
+    --gold-glow: rgba(228, 174, 57, 0.35);
+    --text-white: #ffffff;
+    --text-muted: #8492a6;
+    
+    /* Цвета редкостей CS2 */
+    --rarity-milspec: #4b69ff;
+    --rarity-restricted: #8847ff;
+    --rarity-classified: #d32ce6;
+    --rarity-covert: #eb4b4b;
+    --rarity-gold: #e4ae39;
+    
+    --red: #ff4a4a;
+    --green: #24d16e;
+    --font-main: 'Rajdhani', sans-serif;
+    --font-header: 'Orbitron', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-white);
+    font-family: var(--font-main);
+    font-size: 16px;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+/* Скроллбар */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-darker);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--gold);
+    border-radius: 3px;
+}
+
+/* ═══════════════════════════════════════
+   2. ЛЕНТА LIVE-ДРОПА (DROP TICKER)
+   ═══════════════════════════════════════ */
+#dropTicker {
+    width: 100%;
+    height: 36px;
+    background: rgba(8, 9, 13, 0.98);
+    border-bottom: 1px solid rgba(228, 174, 57, 0.2);
+    display: flex;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    overflow: hidden;
+}
+
+.ticker-lbl {
+    background: var(--gold);
+    color: var(--bg-darker);
+    font-family: var(--font-header);
+    font-weight: 900;
+    font-size: 11px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    z-index: 102;
+    box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+}
+
+.ticker-inner {
+    display: flex;
+    white-space: nowrap;
+    animation: tickerScroll 45s linear infinite;
+}
+
+.ticker-inner:hover {
+    animation-play-state: paused;
+}
+
+@keyframes tickerScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+.ticker-item {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 20px;
+    height: 36px;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.ticker-item img {
+    height: 24px;
+    margin-right: 8px;
+}
+
+/* ═══════════════════════════════════════
+   3. ЭКРАН АВТОРИЗАЦИИ (LOGIN & TABS)
+   ═══════════════════════════════════════ */
+#loginScreen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle, var(--bg-dark) 40%, var(--bg-darker) 100%);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-box {
+    background: var(--bg-panel);
+    border: 1px solid rgba(228, 174, 57, 0.15);
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 4px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+}
+
+.login-logo {
+    font-family: var(--font-header);
+    font-weight: 900;
+    font-size: 32px;
+    letter-spacing: 2px;
+}
+
+.login-logo span { color: var(--gold); }
+
+.login-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 4px;
+    margin-bottom: 30px;
+}
+
+/* Переключатели табов Вход / Регистрация */
+.auth-tabs {
+    display: flex;
+    margin-bottom: 25px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.auth-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-header);
+    font-weight: 700;
+    padding: 12px 0;
+    cursor: pointer;
+    font-size: 14px;
+    letter-spacing: 1px;
+    transition: 0.2s;
+}
+
+.auth-tab.active {
+    color: var(--gold);
+    border-bottom: 2px solid var(--gold);
+}
+
+.login-input {
+    width: 100%;
+    background: var(--bg-darker);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-white);
+    padding: 14px;
+    margin-bottom: 15px;
+    font-family: var(--font-main);
+    font-weight: 600;
+    outline: none;
+    transition: 0.2s;
+}
+
+.login-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 10px var(--gold-glow);
+}
+
+.login-btn {
+    width: 100%;
+    background: linear-gradient(90deg, #c8922a, var(--gold));
+    color: var(--bg-darker);
+    border: none;
+    padding: 14px;
+    font-family: var(--font-header);
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: 0.2s;
+}
+
+.login-btn:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 0 15px var(--gold-glow);
+}
+
+.auth-divider {
+    margin: 20px 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    position: relative;
+}
+
+.auth-divider::before, .auth-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 33%;
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+}
+.auth-divider::before { left: 0; }
+.auth-divider::after { right: 0; }
+
+/* Кнопка входа Google */
+.google-btn {
+    width: 100%;
+    background: #ffffff;
+    color: #1f2937;
+    border: none;
+    padding: 12px;
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-radius: 2px;
+    transition: 0.2s;
+}
+
+.google-btn:hover {
+    background: #e5e7eb;
+}
+
+/* ═══════════════════════════════════════
+   4. ШАПКА И НАВИГАЦИЯ (HEADER & NAV)
+   ═══════════════════════════════════════ */
+.header {
+    background: var(--bg-panel);
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.logo {
+    font-family: var(--font-header);
+    font-weight: 900;
+    font-size: 24px;
+}
+.logo span { color: var(--gold); }
+
+.hdr-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.balance-wrap {
+    text-align: right;
+}
+
+.balance-lbl {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: block;
+    letter-spacing: 1px;
+}
+
+.balance-val {
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--gold);
+}
+
+.user-pill {
+    background: rgba(255,255,255,0.05);
+    padding: 8px 16px;
+    border-radius: 2px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    font-size: 14px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.add1-btn {
+    background: rgba(36, 209, 110, 0.1);
+    color: var(--green);
+    border: 1px solid var(--green);
+    padding: 6px 12px;
+    font-family: var(--font-header);
+    font-weight: 700;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: 0.2s;
+}
+.add1-btn:hover {
+    background: var(--green);
+    color: var(--bg-darker);
+}
+
+/* Навигация приложения */
+.nav {
+    display: flex;
+    justify-content: center;
+    background: var(--bg-darker);
+    gap: 5px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.nav-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-header);
+    font-weight: 700;
+    padding: 12px 30px;
+    cursor: pointer;
+    transition: 0.2s;
+    letter-spacing: 1px;
+    position: relative;
+}
+
+.nav-tab:hover, .nav-tab.active {
+    color: var(--gold);
+}
+
+.nav-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -10px; left: 0; right: 0;
+    height: 2px;
+    background: var(--gold);
+    box-shadow: 0 0 8px var(--gold);
+}
+
+/* Контейнеры страниц */
+.main { padding: 40px; max-width: 1400px; margin: 0 auto; }
+.page { display: none; }
+.page.active { display: block; }
+
+.section-title {
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 2px;
+    margin: 30px 0 20px 0;
+    border-left: 3px solid var(--gold);
+    padding-left: 12px;
+}
+.section-title span { color: var(--text-muted); font-weight: 400; }
+
+/* ═══════════════════════════════════════
+   5. ВИТРИНА КЕЙСОВ (CASES GRID)
+   ═══════════════════════════════════════ */
+.cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 25px;
+}
+
+.case-card {
+    background: var(--bg-panel);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.case-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--gold);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+
+.case-badge {
+    position: absolute;
+    top: 10px; right: 10px;
+    font-size: 10px;
+    font-family: var(--font-header);
+    font-weight: 900;
+    padding: 3px 8px;
+    border-radius: 2px;
+}
+.badge-hot { background: var(--red); color: white; }
+.badge-custom { background: var(--rarity-restricted); color: white; }
+
+.case-card-art svg {
+    width: 90px;
+    height: 90px;
+    margin: 15px auto;
+    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
+}
+
+.case-card-name {
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.case-card-price {
+    font-family: var(--font-header);
+    color: var(--gold);
+    font-weight: 700;
+}
+
+/* ═══════════════════════════════════════
+   6. ИНВЕНТАРЬ (INVENTORY & RARITIES)
+   ═══════════════════════════════════════ */
+.inv-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-panel);
+    padding: 15px 25px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.inv-filter {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-muted);
+    padding: 6px 16px;
+    cursor: pointer;
+    font-family: var(--font-header);
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 5px;
+    transition: 0.2s;
+}
+.inv-filter.active, .inv-filter:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+}
+
+.inv-stats {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.inv-stats span {
+    color: var(--gold);
+    font-family: var(--font-header);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.inv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+}
+
+.inv-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 50px 0;
+    color: var(--text-muted);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.inv-item {
+    background: var(--bg-panel);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 4px solid var(--text-muted);
+    padding: 15px;
+    text-align: center;
+    position: relative;
+    border-radius: 4px;
+}
+
+.inv-item img {
+    max-width: 100%;
+    height: 90px;
+    object-fit: contain;
+    margin-bottom: 10px;
+}
+
+.inv-weapon { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.inv-name { font-size: 14px; font-weight: 700; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.inv-wear { font-size: 11px; background: rgba(0,0,0,0.3); width: max-content; padding: 1px 6px; margin: 0 auto 8px auto; border-radius: 2px;}
+.inv-price { font-family: var(--font-header); color: var(--gold); font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+
+/* Подсветка карточек в зависимости от редкости выпавшего скина */
+.rc-milspec { border-bottom-color: var(--rarity-milspec) !important; box-shadow: inset 0 -15px 25px rgba(75, 105, 255, 0.05); }
+.rc-restricted { border-bottom-color: var(--rarity-restricted) !important; box-shadow: inset 0 -15px 25px rgba(136, 71, 255, 0.05); }
+.rc-classified { border-bottom-color: var(--rarity-classified) !important; box-shadow: inset 0 -15px 25px rgba(211, 44, 230, 0.05); }
+.rc-covert { border-bottom-color: var(--rarity-covert) !important; box-shadow: inset 0 -15px 25px rgba(235, 75, 75, 0.05); }
+.rc-gold { border-bottom-color: var(--rarity-gold) !important; box-shadow: inset 0 -15px 25px rgba(228, 174, 57, 0.08); }
+
+.btn-sell-inv {
+    width: 100%;
+    background: rgba(255,74,74,0.1);
+    color: var(--red);
+    border: 1px solid var(--red);
+    padding: 5px 0;
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 11px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.btn-sell-inv:hover { background: var(--red); color: white; }
+
+/* ═══════════════════════════════════════
+   7. МОДАЛЬНОЕ ОКНО И РУЛЕТКА (ROULETTE)
+   ═══════════════════════════════════════ */
+.overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(4, 5, 8, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+}
+.overlay.active { opacity: 1; pointer-events: auto; }
+
+.modal {
+    background: var(--bg-panel);
+    border: 1px solid rgba(228, 174, 57, 0.2);
+    width: 90%;
+    max-width: 950px;
+    border-radius: 4px;
+    padding: 30px;
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    top: 15px; right: 20px;
+    background: transparent; border: none;
+    color: var(--text-muted); font-size: 28px; cursor: pointer;
+}
+.modal-close:hover { color: white; }
+
+.modal-hdr {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.modal-info h2 {
+    font-family: var(--font-header);
+    font-weight: 700;
+    font-size: 22px;
+    margin-bottom: 4px;
+}
+.modal-info p {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+.open-cost {
+    color: var(--gold);
+    font-family: var(--font-header);
+    font-weight: 700;
+}
+
+/* Оболочка карусели */
+.roulette-wrap {
+    width: 100%;
+    background: var(--bg-darker);
+    padding: 20px 0;
+    border: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 30px;
+    position: relative;
+}
+
+.roulette-track-wrap {
+    width: 100%;
+    height: 130px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Центральный маркер / Стрелка */
+.roulette-arrow {
+    position: absolute;
+    top: 0; bottom: 0; left: 50%;
+    width: 2px;
+    background: var(--gold);
+    z-index: 10;
+    box-shadow: 0 0 10px var(--gold), 0 0 20px var(--gold);
+    transform: translateX(-50%);
+}
+
+.roulette-track {
+    display: flex;
+    gap: 8px;
+    position: absolute;
+    left: 0; top: 0;
+    height: 100%;
+    will-change: transform;
+}
+
+/* Элемент внутри трека */
+.roulette-card {
+    width: 120px;
+    height: 130px;
+    background: var(--bg-card);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    text-align: center;
+    border-bottom: 3px solid var(--text-muted);
+}
+
+.roulette-card img {
+    width: 75px;
+    height: 55px;
+    object-fit: contain;
+}
+
+.roulette-card-wpn { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; }
+.roulette-card-name { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+
+.btn-gold {
+    background: linear-gradient(90deg, #c8922a, var(--gold));
+    color: var(--bg-darker);
+    border: none; padding: 12px 35px;
+    font-family: var(--font-header); font-weight: 700;
+    cursor: pointer; border-radius: 2px;
+}
+.btn-gold:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.result-grid {
+    display: flex;
+    justify-content: center;
+}
+
+/* ═══════════════════════════════════════
+   8. СТРАНИЦА АПГРЕЙДЕРА (UPGRADE)
+   ═══════════════════════════════════════ */
+.upgrade-arena {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-panel);
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 40px;
+    margin-bottom: 30px;
+    gap: 30px;
+}
+
+.upgrade-arena-side { width: 35%; text-align: center; }
+.upgrade-arena-label { font-family: var(--font-header); font-size: 12px; color: var(--text-muted); margin-bottom: 15px; letter-spacing: 1px; }
+
+.upgrade-slot {
+    background: var(--bg-darker);
+    border: 2px dashed rgba(255,255,255,0.1);
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    padding: 20px;
+}
+.us-label { font-size: 14px; color: var(--text-muted); font-weight: 600; }
+
+.upgrade-mid { width: 25%; text-align: center; }
+
+.upgrade-chance {
+    font-family: var(--font-header);
+    font-size: 48px;
+    font-weight: 900;
+    color: var(--gold);
+    text-shadow: 0 0 20px var(--gold-glow);
+    margin-bottom: 20px;
+}
+
+.upgrade-btn {
+    width: 100%;
+    background: linear-gradient(180deg, var(--gold), #a4751c);
+    color: var(--bg-darker);
+    border: none; padding: 15px 0;
+    font-family: var(--font-header); font-weight: 900;
+    font-size: 18px; cursor: pointer; letter-spacing: 1px;
+}
+.upgrade-btn:disabled { opacity: 0.25; cursor: not-allowed; filter: grayscale(1); }
+
+.upg-panel { background: var(--bg-panel); padding: 20px; border: 1px solid rgba(255,255,255,0.05); }
+.upg-search { width: 100%; background: var(--bg-darker); border: 1px solid rgba(255,255,255,0.1); padding: 12px; color: white; font-family: var(--font-main); }
+
+.upg-catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.upg-item {
+    background: var(--bg-card);
+    padding: 12px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.upg-item:hover { border-color: rgba(228,174,57,0.4); }
+.upg-item.selected { border-color: var(--gold); background: rgba(228,174,57,0.05); }
+.uii-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 70%; }
+.uii-price { font-family: var(--font-header); color: var(--gold); font-size: 13px; font-weight: 700; }
+
+/* ═══════════════════════════════════════
+   9. СИСТЕМА УВЕДОМЛЕНИЙ (TOASTS)
+   ═══════════════════════════════════════ */
+.toast-wrap {
+    position: fixed;
+    bottom: 25px; right: 25px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    background: var(--bg-panel);
+    border-left: 4px solid var(--gold);
+    color: white;
+    padding: 15px 25px;
+    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border-radius: 2px;
+    min-width: 250px;
+    opacity: 1;
+}
+.toast.success { border-left-color: var(--green); }
+.toast.error { border-left-color: var(--red); }
