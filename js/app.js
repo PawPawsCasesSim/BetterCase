@@ -4,55 +4,83 @@ import { renderInventory } from './inventory.js';
 import { initUpgradePage } from './upgrade.js';
 import { db, auth } from './firebase-config.js';
 import { ref, update } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+import { signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
 let localUserData = null;
-let isAppInitialized = false; // Флаг, чтобы не дублировать подписку на кнопки при каждом обновлении базы
+let isAppInitialized = false; 
 
-// Инициализация при загрузке
+// Инициализация приложения при загрузке
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Сначала запускаем только авторизацию
+    // Инициализируем кнопку принудительного выхода, чтобы можно было сменить аккаунт Google
+    initLogoutButton();
+
     initAuth((user, data) => {
-        // Если юзер вышел или данных нет — сбрасываем и ничего не рендерим
+        // Если пользователь не авторизован или вылогинился
         if (!user || !data) {
             localUserData = null;
-            const userPill = document.getElementById('userPill');
-            const userBalance = document.getElementById('userBalance');
-            if (userPill) userPill.textContent = 'ГОСТЬ';
-            if (userBalance) userBalance.textContent = '$0.00';
+            updateUIForGuest();
             return;
         }
 
         localUserData = data;
         
-        // Обновляем шапку профиля
+        // Обновляем шапку профиля (Баланс и Имя)
         const userPill = document.getElementById('userPill');
         const userBalance = document.getElementById('userBalance');
         
         if (userPill) userPill.textContent = data.username.toUpperCase();
-        if (userBalance) userBalance.textContent = `$${data.balance.toFixed(2)}`;
+        if (userBalance) userBalance.textContent = `$${Number(data.balance).toFixed(2)}`;
         
-        // 2. Когда пользователь успешно вошел — один раз собираем интерфейс
+        // Сборка интерфейса при первом входе
         if (!isAppInitialized) {
             initApp();
             isAppInitialized = true;
         }
 
-        // Перерендер инвентаря и апгрейдера при любых изменениях в Realtime DB
-        renderInventory(data);
+        // Автоматический перерендер инвентаря и апгрейдов при любых изменениях в базе данных Firebase
+        if (typeof renderInventory === 'function') {
+            renderInventory(data);
+        } else {
+            console.warn("⚠️ Функция renderInventory не найдена в импорте inventory.js");
+        }
+        
         initUpgradePage(data);
     });
 });
 
-// Сборка основных компонентов симулятора после входа в аккаунт
+function updateUIForGuest() {
+    const userPill = document.getElementById('userPill');
+    const userBalance = document.getElementById('userBalance');
+    if (userPill) userPill.textContent = 'ГОСТЬ';
+    if (userBalance) userBalance.textContent = '$0.00';
+    isAppInitialized = false;
+}
+
+// Функция для принудительного разлогина (чтобы сбросить авто-вход Google)
+function initLogoutButton() {
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            try {
+                await signOut(auth);
+                console.log("🔄 Вы успешно вышли из аккаунта. Теперь можно войти под другим пользователем.");
+                window.location.reload(); // Перезагружаем страницу для очистки состояний
+            } catch (err) {
+                console.error("Ошибка при выходе:", err);
+            }
+        };
+    }
+}
+
 function initApp() {
     renderCasesTabs();
     initNavigation();
     initBalanceCheat();
     initModalEvents();
-    initCaseOpenEvent(); // Оживляем кнопку открытия кейса!
+    initCaseOpenEvent(); 
 }
 
-// Навигация по вкладкам (Кейсы / Инвентарь / Апгрейды)
+// Навигация между страницами
 function initNavigation() {
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -70,7 +98,7 @@ function initNavigation() {
     });
 }
 
-// Отображение кейсов на витрине сайта
+// Витрина кейсов
 function renderCasesTabs() {
     const officialGrid = document.getElementById('officialCasesGrid');
     const customGrid = document.getElementById('customCasesGrid');
@@ -92,25 +120,24 @@ function renderCasesTabs() {
         return card;
     };
 
-    // Очищаем сетку перед заполнением, чтобы избежать дублирования карт
     if (officialGrid) {
         officialGrid.innerHTML = '';
-        if (casesData.official) {
+        if (casesData && casesData.official) {
             Object.entries(casesData.official).forEach(([id, c]) => officialGrid.appendChild(buildCard(id, c, false)));
         }
     }
     
     if (customGrid) {
         customGrid.innerHTML = '';
-        if (casesData.custom) {
+        if (casesData && casesData.custom) {
             Object.entries(casesData.custom).forEach(([id, c]) => customGrid.appendChild(buildCard(id, c, true)));
         }
     }
 }
 
-// Управление модальным окном рулетки
 let currentActiveCase = null;
 
+// Открытие модального окна кейса
 function openCaseModal(caseId, isCustom) {
     currentActiveCase = { id: caseId, isCustom };
     const pool = isCustom ? casesData.custom[caseId] : casesData.official[caseId];
@@ -124,47 +151,44 @@ function openCaseModal(caseId, isCustom) {
     if (modalCaseName) modalCaseName.textContent = pool.name;
     if (modalCasePrice) modalCasePrice.textContent = `$${pool.price.toFixed(2)}`;
     
-    // НАПОЛНЯЕМ КЕЙС ПРЕДМЕТАМИ ПЕРЕД ОТКРЫТИЕМ (Чтобы окно не было пустым черным квадратом)
+    // Предзаполняем рулетку красивыми скинами из кейса
     fillCasePreviewItems(pool);
 
     if (overlay) overlay.classList.add('active');
 }
 
-/**
- * Заполняет рулетку предметами, которые содержатся в открываемом кейсе
- */
+// Заполнение рулетки скинами перед стартом
 function fillCasePreviewItems(casePool) {
-    // Ищем контейнер с прокруткой. Убедись, что внутри черного окна у тебя есть тег с классом .roulette-container
-    const rouletteContainer = document.querySelector('.roulette-container');
-    if (!rouletteContainer || !casePool.items) return;
+    // ВАЖНО: Ищем селектор. Если класса .roulette-container нет, ищем ЛЮБОЙ блок внутри черного окна рулетки
+    let rouletteContainer = document.querySelector('.roulette-container') || document.querySelector('#caseModalOverlay .modal-body div');
+    
+    if (!rouletteContainer) {
+        console.error("❌ Ошибка: Контейнер для прокрутки рулетки (.roulette-container) не найден в HTML!");
+        return;
+    }
 
     rouletteContainer.innerHTML = '';
-    // Сбрасываем стили анимации прокрутки в дефолт
     rouletteContainer.style.transition = 'none';
     rouletteContainer.style.transform = 'translateX(0)';
 
-    // Создаем сетку превью-предметов кейса
+    if (!casePool.items) return;
+
     casePool.items.forEach(item => {
         const itemBlock = document.createElement('div');
         itemBlock.className = `roulette-skin-card ${item.rarity || 'mil-spec'}`;
-        // Если в базе задан цвет (например, красный для тайного #eb4b4b), подсвечиваем карточку
-        if (item.color) {
-            itemBlock.style.borderBottom = `4px solid ${item.color}`;
-        }
+        if (item.color) itemBlock.style.borderBottom = `4px solid ${item.color}`;
+        
         itemBlock.innerHTML = `
-            <div class="card-weapon">${item.name.split(' | ')[0]}</div>
-            <div class="card-skin">${item.name.split(' | ')[1] || 'Vanilla'}</div>
+            <div class="card-weapon" style="font-weight:bold; font-size:12px; color:#fff;">${item.name.split(' | ')[0]}</div>
+            <div class="card-skin" style="font-size:11px; color:#aaa;">${item.name.split(' | ')[1] || 'Vanilla'}</div>
         `;
         rouletteContainer.appendChild(itemBlock);
     });
 }
 
-/**
- * Инициализация события клика на большую желтую кнопку "ОТКРЫТЬ КЕЙС"
- */
+// Клик на кнопку "ОТКРЫТЬ КЕЙС"
 function initCaseOpenEvent() {
     const openCaseBtn = document.getElementById('openCaseBtn');
-    
     if (!openCaseBtn) return;
 
     openCaseBtn.onclick = async () => {
@@ -174,84 +198,96 @@ function initCaseOpenEvent() {
         }
         if (!currentActiveCase) return;
 
-        openCaseBtn.disabled = true; // Запрещаем кликать во время открытия
+        openCaseBtn.disabled = true;
 
-        // Вызываем бэкенд из cases.js (списание баланса, добавление предмета в БД, получение живой цены)
+        // Бэкенд-запрос: списывает деньги в БД и генерирует дроп
         const winItem = await openCase(currentActiveCase.id, localUserData);
 
         if (winItem) {
-            console.log("🎉 Предмет определен бэкендом. Запускаем анимацию для:", winItem.name);
-            
-            // Запуск анимации прокрутки рулетки
+            // Запуск анимации прокрутки
             animateRoulette(winItem);
         } else {
-            // Если openCase вернул null (например, не хватило денег), возвращаем кнопку в рабочее состояние
             openCaseBtn.disabled = false;
         }
     };
 }
 
-/**
- * Простая и плавная анимация прокрутки рулетки к выигранному предмету
- */
+// Функция анимации прокрутки рулетки к выигранному скину
 function animateRoulette(winItem) {
-    const rouletteContainer = document.querySelector('.roulette-container');
+    let rouletteContainer = document.querySelector('.roulette-container') || document.querySelector('#caseModalOverlay .modal-body div');
     const openCaseBtn = document.getElementById('openCaseBtn');
+    
     if (!rouletteContainer) {
+        alert(`🎉 Вы выбили: ${winItem.name} ($${winItem.price.toFixed(2)})`);
         if (openCaseBtn) openCaseBtn.disabled = false;
         return;
     }
 
-    // Генерируем красивую длинную ленту для прокрутки (миксуем предметы кейса)
+    // Принудительно задаем контейнеру flex-стили, чтобы карточки выстроились в одну горизонтальную линию
+    rouletteContainer.style.display = 'flex';
+    rouletteContainer.style.flexDirection = 'row';
+    rouletteContainer.style.whiteSpace = 'nowrap';
+
     rouletteContainer.innerHTML = '';
     const pool = currentActiveCase.isCustom ? casesData.custom[currentActiveCase.id] : casesData.official[currentActiveCase.id];
     
     let longItemsList = [];
-    // Делаем цепочку из 30 предметов, чтобы рулетка крутилась долго
-    for (let i = 0; i < 30; i++) {
+    // Делаем цепочку из 45 предметов для долгого и красивого кручения
+    for (let i = 0; i < 45; i++) {
         const randomItem = pool.items[Math.floor(Math.random() * pool.items.length)];
         longItemsList.push(randomItem);
     }
     
-    // На 25-е место жестко вставляем наш реальный выигрыш winItem из базы Firebase!
-    const winIndex = 24;
+    // Вшиваем реальный выигрыш ровно на 36-ю позицию ленты
+    const winIndex = 35;
     longItemsList[winIndex] = winItem;
 
-    // Отрисовываем эту длинную ленту в HTML
+    // Рендерим длинную ленту карточек
     longItemsList.forEach((item) => {
         const el = document.createElement('div');
         el.className = `roulette-skin-card ${item.rarity || 'mil-spec'}`;
+        el.style.minWidth = '130px'; // Фиксируем ширину карточки в JS для точности расчетов
+        el.style.marginRight = '10px';
+        el.style.textAlign = 'center';
+        el.style.padding = '10px';
+        el.style.background = 'rgba(255,255,255,0.05)';
         if (item.color) el.style.borderBottom = `4px solid ${item.color}`;
+        
         el.innerHTML = `
-            <div class="card-weapon">${item.name.split(' | ')[0]}</div>
-            <div class="card-skin">${item.name.split(' | ')[1] || 'Vanilla'}</div>
+            <div class="card-weapon" style="font-weight:bold; color:#fff;">${item.name.split(' | ')[0]}</div>
+            <div class="card-skin" style="color:#bbb; font-size:12px;">${item.name.split(' | ')[1] || 'Vanilla'}</div>
         `;
         rouletteContainer.appendChild(el);
     });
 
-    // Сбрасываем позицию перед стартом
+    // Сброс позиции в ноль
     rouletteContainer.style.transition = 'none';
     rouletteContainer.style.transform = 'translateX(0)';
 
-    // Рассчитываем сдвиг. Допустим, ширина одной карточки скина вместе с отступами — 130px.
-    const cardWidth = 130; 
-    // Сдвигаем ленту так, чтобы 25-я карточка оказалась точно по центру вертикальной полоски
-    const finalShift = (winIndex * cardWidth) - (rouletteContainer.parentElement.offsetWidth / 2) + (cardWidth / 2);
+    // Расчет точного сдвига к центру 36-й карточки
+    const cardWidth = 140; // 130px ширина + 10px отступ marginRight
+    const parentWidth = rouletteContainer.parentElement.offsetWidth || 600;
+    const finalShift = (winIndex * cardWidth) - (parentWidth / 2) + (cardWidth / 2);
 
-    // Включаем плавную анимацию через тайм-аут
+    // Включаем прокрутку со стильной физикой замедления CS:GO (cubic-bezier)
     setTimeout(() => {
-        rouletteContainer.style.transition = 'transform 4s cubic-bezier(0.1, 0.6, 0.1, 1)'; // Плавное замедление в конце
+        rouletteContainer.style.transition = 'transform 4.5s cubic-bezier(0.05, 0.45, 0.1, 1)';
         rouletteContainer.style.transform = `translateX(-${finalShift}px)`;
     }, 50);
 
-    // Когда анимация закончилась (через 4 секунды)
+    // Окончание анимации
     setTimeout(() => {
-        alert(`🎉 Вы выбили: ${winItem.name} ($${winItem.price.toFixed(2)})`);
-        if (openCaseBtn) openCaseBtn.disabled = false; // Включаем кнопку обратно
-    }, 4200);
+        // Показываем красивое всплывающее уведомление
+        showWinAlert(winItem);
+        if (openCaseBtn) openCaseBtn.disabled = false; 
+    }, 4600);
 }
 
-// Инициализация обработчиков закрытия модалки
+// Кастомное модальное окно выигрыша (чтобы не использовать уродливый браузерный alert)
+function showWinAlert(item) {
+    alert(`🎉 ВЫ ВЫБИЛИ ПРЕДМЕТ!\n\n${item.name}\nРеальная стоимость: $${item.price.toFixed(2)}`);
+}
+
 function initModalEvents() {
     const closeBtn = document.getElementById('closeModalBtn');
     const overlay = document.getElementById('caseModalOverlay');
@@ -263,7 +299,7 @@ function initModalEvents() {
     }
 }
 
-// Кнопка тестового пополнения баланса (+100$)
+// Кнопка тестового баланса
 function initBalanceCheat() {
     const addFundsBtn = document.getElementById('addFundsBtn');
     if (!addFundsBtn) return;
