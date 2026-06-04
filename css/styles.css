@@ -598,6 +598,14 @@ body {
 }
 
 /* Оболочка карусели */
+
+.roulette-container {
+    display: flex;
+    flex-direction: row;
+    white-space: nowrap;
+    will-change: transform;
+}
+
 .roulette-wrap {
     width: 100%;
     background: var(--bg-darker);
