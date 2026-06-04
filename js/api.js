@@ -1,6 +1,6 @@
 // ⚠️ ВАЖНО: API-ключ лучше хранить в переменной окружения или серверной части,
 // а не в публичном коде. Для локального теста можно вставить ключ здесь.
-const API_KEY = 'YOUR_CSFLOAT_API_KEY'; // <-- замените своим ключом (не коммитьте в git!)
+const API_KEY = '8_FPa9KzhoP_-1QZMdv8pTn8EaXNlVY_'; // <-- замените своим ключом (не коммитьте в git!)
 
 const BASE_API_URL = 'https://csfloat.com/api/v1';
 const CORS_PROXY = 'https://api.allorigins.win/get?url=';
