@@ -12,7 +12,7 @@ export async function initUpgradePage(userData) {
     const catalogGrid = document.getElementById('upgradeCatalogGrid');
     const invGrid = document.getElementById('upgradeInventoryGrid'); // Убедись, что такой ID есть в HTML для твоего инвентаря
     
-    if (catalogGrid) catalogGrid.innerHTML = 'Загрузка цен API...';
+    if (catalogGrid) catalogGrid.innerHTML = 'Загрузка реальных цен от CSFloat...';
     if (invGrid) invGrid.innerHTML = '';
 
     // Сбрасываем старые выборы при перезагрузке страницы
@@ -23,33 +23,34 @@ export async function initUpgradePage(userData) {
     // 1. ПОЛУЧАЕМ И ПРАВИЛЬНО ОБРАБАТЫВАЕМ ЦЕНЫ ИЗ API
     const rawPrices = await fetchSkinPrices();
     
-    // Безопасная проверка: если прилетел объект от AllOrigins/CSFloat, 
-    // цены обычно лежат в корне, либо внутри свойства, проверяем оба варианта
+    // Безопасная проверка на случай, если прокси AllOrigins вернул данные в поле contents
     const prices = rawPrices && rawPrices.contents ? JSON.parse(rawPrices.contents) : rawPrices;
 
     if (catalogGrid) catalogGrid.innerHTML = '';
 
     if (!prices || Object.keys(prices).length === 0) {
-        if (catalogGrid) catalogGrid.innerHTML = '<div style="color:red;">Не удалось загрузить цены API</div>';
+        if (catalogGrid) catalogGrid.innerHTML = '<div style="color:red; padding:10px;">Не удалось загрузить цены API</div>';
         return;
     }
 
     // Рендерим первые 40 предметов из живого ответа CSFloat API
     Object.entries(prices).slice(0, 40).forEach(([skinName, priceData]) => {
-        // РЕШЕНИЕ ПАРСИНГА: CSFloat отдает цену как число напрямую ИЛИ как объект { lowest_price: X }
+        
+        // РЕШЕНИЕ ОШИБКИ .toFixed(): Проверяем, что пришло — число или объект
         let finalPrice = 0;
         if (typeof priceData === 'number') {
             finalPrice = priceData;
         } else if (priceData && typeof priceData === 'object') {
+            // Если CSFloat прислал объект, берем минимальную или медианную цену
             finalPrice = priceData.lowest_price || priceData.median_price || 0;
         }
 
-        // Если в API цены указаны в центах (целые числа больше 100), переводим их в доллары
+        // Если в API цены указаны в центах (целые числа больше 500), переводим их в доллары
         if (finalPrice > 500 && Number.isInteger(finalPrice)) {
             finalPrice = finalPrice / 100;
         }
 
-        // Пропускаем слишком дешевые или сломанные позиции
+        // Пропускаем предметы со сломанной ценой
         if (finalPrice <= 0) return;
 
         const el = document.createElement('div');
@@ -69,7 +70,7 @@ export async function initUpgradePage(userData) {
         if (catalogGrid) catalogGrid.appendChild(el);
     });
 
-    // 2. РЕНДЕРИНГ ИНВЕНТАРЯ ИГРОКА (Чтобы было что апгрейдить)
+    // 2. РЕНДЕРИНГ ИНВЕНТАРЯ ИГРОКА (Чтобы было из чего делать апгрейд)
     if (invGrid && userData && userData.inventory) {
         Object.entries(userData.inventory).forEach(([itemId, itemData]) => {
             if (!itemData) return;
@@ -138,20 +139,20 @@ async function executeUpgrade(userData) {
     
     if (!user || !selectedInvItem || !selectedCatalogItem || !btn) return;
 
-    btn.disabled = true; // Защита от спам-кликов во время запроса к БД
+    btn.disabled = true; // Защита от спам-кликов во время записи в Firebase
 
     let chance = (selectedInvItem.price / selectedCatalogItem.price) * 100;
     let roll = Math.random() * 100;
 
     const updates = {};
-    // Старый предмет сгорает в любом случае (удаляем из базы)
+    // Старый предмет сгорает в любом случае, удаляем его из базы
     updates[`users/${user.uid}/inventory/${selectedInvItem.id}`] = null; 
 
     if (roll <= chance) {
         // УСПЕХ! Генерируем новый улучшенный скин
         const newId = crypto.randomUUID();
         
-        // Аккуратно парсим имя оружия и скина из каталога
+        // Парсим название оружия и скина из каталога
         const nameParts = selectedCatalogItem.name.split(' | ');
         const weaponName = nameParts[0] || "Knife";
         const skinName = nameParts[1] || "Vanilla";
@@ -160,10 +161,10 @@ async function executeUpgrade(userData) {
             id: newId,
             weapon: weaponName,
             skinName: skinName,
-            rarity: selectedCatalogItem.price > 50 ? "rc-covert" : "rc-classified", // Динамическая редкость по цене
+            rarity: selectedCatalogItem.price > 50 ? "rc-covert" : "rc-classified", // Редкость зависит от цены
             wear: "FN", // Factory New за успешный контракт
             price: selectedCatalogItem.price,
-            image: "" // Сюда можно прикрутить ссылки на картинки, если они есть
+            image: ""
         };
         
         alert(`🎉 Успешный Апгрейд!\nВы получили: ${selectedCatalogItem.name} ($${selectedCatalogItem.price.toFixed(2)})`);
@@ -173,7 +174,7 @@ async function executeUpgrade(userData) {
     }
 
     try {
-        // Записываем пакетные обновления в Firebase Realtime Database
+        // Записываем обновления в Firebase Realtime Database
         await update(ref(db), updates);
     } catch (err) {
         console.error("Ошибка обновления инвентаря в Firebase:", err);
@@ -182,8 +183,5 @@ async function executeUpgrade(userData) {
     // Полностью сбрасываем состояние апгрейда для следующего раза
     selectedInvItem = null;
     selectedCatalogItem = null;
-    
-    // Переинициализируем страницу с обновленными из базы данными пользователя
-    // (Локальный userData обновится автоматически благодаря слушателю onValue в auth.js)
     calculateChance();
 }
