@@ -4,8 +4,25 @@ const API_KEY = '8_FPa9KzhoP_-1QZMdv8pTn8EaXNlVY_';
 // Базовый URL для запросов к CSFloat API
 const BASE_API_URL = 'https://csfloat.com/api/v1';
 
+// Публичный CORS-прокси для локальной разработки (обходит блокировку браузера)
+const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+
 // Локальный кэш данных, чтобы не отправлять запросы повторно при каждом открытии кейса
 let cachedSkinsPrices = null;
+
+/**
+ * Резервный фоллбэк (Заглушка с примерными ценами), 
+ * формат должен строго соответствовать тому, что возвращает CSFloat или ожидает твоя система.
+ */
+const DEFAULT_FALLBACK_PRICES = {
+    "AK-47 | Redline (Field-Tested)": 25.50,
+    "AK-47 | Inheritance (Factory New)": 145.00,
+    "AWP | Chrome Cannon (Field-Tested)": 65.00,
+    "M4A1-S | Black Lotus (Minimal Wear)": 18.20,
+    "M4A4 | Howl (Factory New)": 5400.00,
+    "AWP | Dragon Lore (Factory New)": 9200.00,
+    "★ Karambit | Case Hardened (Minimal Wear)": 850.00
+};
 
 /**
  * Получает актуальные цены на скины из CSFloat API с использованием твоего API ключа.
@@ -18,13 +35,13 @@ export async function fetchSkinPrices() {
     }
     
     try {
-        // Делаем запрос к эндпоинту цен CSFloat
-        const response = await fetch(`${BASE_API_URL}/prices`, {
+        // Делаем запрос через CORS-прокси к эндпоинту цен CSFloat
+        // ВАЖНО: У CSFloat авторизация идет БЕЗ 'Bearer ', просто чистый ключ в Authorization
+        const response = await fetch(`${CORS_PROXY}${BASE_API_URL}/prices`, {
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${API_KEY}`, // Передаем твой API ключ
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Authorization': API_KEY, 
+                'Accept': 'application/json'
             }
         });
 
@@ -35,23 +52,21 @@ export async function fetchSkinPrices() {
 
         const data = await response.json();
         
-        // Сохраняем полученный JSON-объект с ценами в кэш
-        cachedSkinsPrices = data;
-        return cachedSkinsPrices;
+        // Проверяем структуру ответа (у CSFloat цены могут лежать внутри объекта или массива)
+        if (data) {
+            cachedSkinsPrices = data;
+            console.log("✅ [API] Цены скинов успешно загружены из CSFloat API");
+            return cachedSkinsPrices;
+        } else {
+            throw new Error("API вернул пустой или некорректный ответ");
+        }
 
     } catch (error) {
-        console.error("⛔ [API] Не удалось загрузить цены через CSFloat API:", error);
+        console.error("⛔ [API] Не удалось загрузить цены через CSFloat API. Активирован фоллбэк.", error);
         
-        // Резервный фоллбэк (Заглушка с примерными ценами), чтобы симулятор работал даже если пропадет сеть
-        return {
-            "AK-47 | Redline (Field-Tested)": 25.50,
-            "AK-47 | Inheritance (Factory New)": 145.00,
-            "AWP | Chrome Cannon (Field-Tested)": 65.00,
-            "M4A1-S | Black Lotus (Minimal Wear)": 18.20,
-            "M4A4 | Howl (Factory New)": 5400.00,
-            "AWP | Dragon Lore (Factory New)": 9200.00,
-            "★ Karambit | Case Hardened (Minimal Wear)": 850.00
-        };
+        // Записываем фоллбэк в кэш, чтобы при следующем клике код не пытался снова стучаться в упавший API
+        cachedSkinsPrices = DEFAULT_FALLBACK_PRICES;
+        return cachedSkinsPrices;
     }
 }
 
@@ -60,10 +75,10 @@ export async function fetchSkinPrices() {
  */
 export async function fetchSkinDetails(marketHashName) {
     try {
-        const response = await fetch(`${BASE_API_URL}/listings?market_hash_name=${encodeURIComponent(marketHashName)}`, {
+        const response = await fetch(`${CORS_PROXY}${BASE_API_URL}/listings?market_hash_name=${encodeURIComponent(marketHashName)}`, {
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${API_KEY}`,
+                'Authorization': API_KEY,
                 'Accept': 'application/json'
             }
         });
